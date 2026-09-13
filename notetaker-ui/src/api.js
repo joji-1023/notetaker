@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Automatically uses VITE_API_URL on Vercel or falls back to localhost for local development
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// Fallback directly to live Render URL if VITE_API_URL is missing
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://notetaker-fbqn.onrender.com';
 const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(/\/$/, '')}/api`;
 
 const api = axios.create({
