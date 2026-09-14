@@ -23,7 +23,7 @@ public class AuthController {
             String response = authService.registerUser(user);
             return ResponseEntity.ok(Map.of("message", response));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 
@@ -37,7 +37,7 @@ public class AuthController {
             String response = authService.loginAndSendOtp(email, password);
             return ResponseEntity.ok(Map.of("message", response));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 
@@ -47,11 +47,11 @@ public class AuthController {
             String email = request.get("email");
             String otp = request.get("otp");
 
-            // Calls AuthService to validate OTP and generate JWT token
-            String jwtToken = authService.verifyOtpAndGenerateToken(email, otp);
-            return ResponseEntity.ok(Map.of("token", jwtToken));
+            // Calls AuthService to validate OTP and generate JWT token + userId
+            Map<String, Object> result = authService.verifyOtpAndGenerateToken(email, otp);
+            return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }
     }
 }

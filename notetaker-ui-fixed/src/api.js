@@ -36,5 +36,5 @@ export const deleteTask = (taskId) => api.delete(`/tasks/${taskId}`);
 export const getNotesByUser = (userId) => api.get(`/notes/user/${userId}`);
 export const createNote = (userId, noteData) => api.post(`/notes/user/${userId}`, noteData);
 export const deleteNote = (noteId, userId) => api.delete(`/notes/${noteId}?userId=${userId}`);
-export const verifyOtp = (otpData) => API.post('/auth/verify-otp', otpData);
+export const verifyOtp = (otpData) => api.post('/auth/verify-otp', otpData);
 export default api;

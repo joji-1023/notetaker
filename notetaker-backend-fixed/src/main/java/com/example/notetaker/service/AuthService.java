@@ -84,7 +84,7 @@ public class AuthService {
         return "OTP sent to your email";
     }
 
-    public String verifyOtpAndGenerateToken(String email, String otp) {
+    public java.util.Map<String, Object> verifyOtpAndGenerateToken(String email, String otp) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -110,7 +110,12 @@ public class AuthService {
         user.setOtpExpiry(null);
         userRepository.save(user);
 
-        return jwtUtil.generateToken(user.getEmail());
+        String token = jwtUtil.generateToken(user.getEmail());
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("token", token);
+        result.put("userId", user.getId());
+        return result;
     }
 
     private String generateOtp() {
