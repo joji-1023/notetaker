@@ -88,7 +88,16 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (user.getOtpCode() == null || !user.getOtpCode().equals(otp)) {
+        // Debug prints to inspect whitespace or mismatches in Render logs
+        System.out.println("--- OTP VERIFICATION DEBUG ---");
+        System.out.println("Stored OTP in DB: [" + user.getOtpCode() + "]");
+        System.out.println("Entered OTP from UI: [" + (otp != null ? otp.trim() : "null") + "]");
+        System.out.println("Expiry Time: " + user.getOtpExpiry() + " | Current Time: " + LocalDateTime.now());
+
+        String cleanedEnteredOtp = otp != null ? otp.trim() : "";
+        String storedOtp = user.getOtpCode() != null ? user.getOtpCode().trim() : "";
+
+        if (storedOtp.isEmpty() || !storedOtp.equals(cleanedEnteredOtp)) {
             throw new RuntimeException("Invalid OTP");
         }
 
