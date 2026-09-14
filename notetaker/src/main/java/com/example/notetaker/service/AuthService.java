@@ -2,6 +2,7 @@ package com.example.notetaker.service;
 
 import com.example.notetaker.model.User;
 import com.example.notetaker.repository.UserRepository;
+import com.example.notetaker.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +16,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, EmailService emailService) {
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       EmailService emailService,
+                       JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.jwtUtil = jwtUtil;
     }
 
     public String registerUser(User userRequest) {
@@ -28,12 +34,10 @@ public class AuthService {
         if (existingUser.isPresent()) {
             User user = existingUser.get();
 
-            // Block registration if account is already verified
             if (user.isVerified()) {
                 throw new RuntimeException("Email already registered");
             }
 
-            // Unverified user attempting registration again: update details & resend OTP
             user.setUsername(userRequest.getUsername());
             user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
 
@@ -47,7 +51,6 @@ public class AuthService {
             return "OTP resent to your email.";
         }
 
-        // Fresh account registration
         User newUser = new User();
         newUser.setUsername(userRequest.getUsername());
         newUser.setEmail(userRequest.getEmail());
@@ -62,6 +65,43 @@ public class AuthService {
 
         emailService.sendOtpEmail(newUser.getEmail(), otp);
         return "Registration successful. Please verify OTP.";
+    }
+
+    public String loginAndSendOtp(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Invalid email or password");
+        }
+
+        String otp = generateOtp();
+        user.setOtpCode(otp);
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+
+        emailService.sendOtpEmail(user.getEmail(), otp);
+        return "OTP sent to your email";
+    }
+
+    public String verifyOtpAndGenerateToken(String email, String otp) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getOtpCode() == null || !user.getOtpCode().equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
+        }
+
+        if (user.getOtpExpiry() == null || user.getOtpExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("OTP has expired");
+        }
+
+        user.setVerified(true);
+        user.setOtpCode(null);
+        user.setOtpExpiry(null);
+        userRepository.save(user);
+
+        return jwtUtil.generateToken(user.getEmail());
     }
 
     private String generateOtp() {
