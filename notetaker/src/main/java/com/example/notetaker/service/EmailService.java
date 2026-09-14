@@ -1,6 +1,6 @@
 package com.example.notetaker.service;
 
-import jakarta.mail.messaging.MimeMessage;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
