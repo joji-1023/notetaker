@@ -6,6 +6,7 @@ import com.example.notetaker.security.JwtUtil;
 import com.example.notetaker.service.EmailService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Transactional // Rolls back userRepository.save(user) if emailService throws an exception
     public ResponseEntity<?> register(@RequestBody User userRequest) {
         if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Email already registered"));
@@ -46,6 +48,7 @@ public class AuthController {
     }
 
     @PostMapping("/verify-otp")
+    @Transactional
     public ResponseEntity<?> verifyOtp(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         String otp = request.get("otp");
@@ -72,6 +75,7 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
+    @Transactional
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         String email = request.get("email");
         Optional<User> userOpt = userRepository.findByEmail(email);
@@ -90,6 +94,7 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
+    @Transactional
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         String token = request.get("token");
         String newPassword = request.get("newPassword");
