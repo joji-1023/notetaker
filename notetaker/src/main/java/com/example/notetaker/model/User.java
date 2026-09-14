@@ -20,16 +20,25 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "is_verified", nullable = false, columnDefinition = "boolean default false")
     private boolean isVerified = false;
+
+    @Column(name = "otp_code")
     private String otpCode;
+
+    @Column(name = "otp_expiry")
     private LocalDateTime otpExpiry;
 
+    @Column(name = "reset_token")
     private String resetToken;
+
+    @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=Vision1";
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {}
