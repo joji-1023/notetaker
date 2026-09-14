@@ -33,9 +33,9 @@ public class AuthController {
             String email = request.get("email");
             String password = request.get("password");
 
-            // Calls AuthService to authenticate user and send OTP email
-            String response = authService.loginAndSendOtp(email, password);
-            return ResponseEntity.ok(Map.of("message", response));
+            // Calls AuthService to authenticate the user and issue a JWT token
+            Map<String, Object> result = authService.loginUser(email, password);
+            return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage(), "message", e.getMessage()));
         }

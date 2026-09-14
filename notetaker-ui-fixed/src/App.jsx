@@ -112,7 +112,7 @@ function App() {
 
     try {
       if (isLogin) {
-        const res = await loginUser({ username: authData.username, password: authData.password });
+        const res = await loginUser({ email: authData.email, password: authData.password });
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('userId', res.data.userId);
         setUserId(res.data.userId);
@@ -335,12 +335,12 @@ function App() {
 
           <form onSubmit={handleAuthSubmit} className="auth-form">
             <div className="input-field-group">
-              <User size={16} className="field-icon" />
+              {isLogin ? <Mail size={16} className="field-icon" /> : <User size={16} className="field-icon" />}
               <input 
-                type="text" 
-                placeholder="Username" 
-                value={authData.username} 
-                onChange={(e) => setAuthData({ ...authData, username: e.target.value })} 
+                type={isLogin ? "email" : "text"} 
+                placeholder={isLogin ? "Email" : "Username"} 
+                value={isLogin ? authData.email : authData.username} 
+                onChange={(e) => setAuthData({ ...authData, [isLogin ? 'email' : 'username']: e.target.value })} 
                 required 
               />
             </div>

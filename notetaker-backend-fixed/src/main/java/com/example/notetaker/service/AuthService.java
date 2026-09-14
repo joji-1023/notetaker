@@ -67,7 +67,7 @@ public class AuthService {
         return "Registration successful. Please verify OTP.";
     }
 
-    public String loginAndSendOtp(String email, String password) {
+    public java.util.Map<String, Object> loginUser(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
@@ -75,13 +75,16 @@ public class AuthService {
             throw new RuntimeException("Invalid email or password");
         }
 
-        String otp = generateOtp();
-        user.setOtpCode(otp);
-        user.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
-        userRepository.save(user);
+        if (!user.isVerified()) {
+            throw new RuntimeException("Please verify your email before logging in");
+        }
 
-        emailService.sendOtpEmail(user.getEmail(), otp);
-        return "OTP sent to your email";
+        String token = jwtUtil.generateToken(user.getEmail());
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("token", token);
+        result.put("userId", user.getId());
+        return result;
     }
 
     public java.util.Map<String, Object> verifyOtpAndGenerateToken(String email, String otp) {
