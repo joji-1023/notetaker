@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import API from '../api';
+import API from '../api'; // Your Axios instance
 
 export default function OtpModal({ email, onSuccess, onClose }) {
   const [otp, setOtp] = useState('');
@@ -9,7 +9,7 @@ export default function OtpModal({ email, onSuccess, onClose }) {
   const handleVerify = async (e) => {
     e.preventDefault();
     if (otp.length !== 6) {
-      toast.error('Please enter a 6-digit OTP code');
+      toast.error('Please enter a 6-digit code');
       return;
     }
 
@@ -27,7 +27,7 @@ export default function OtpModal({ email, onSuccess, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full text-white text-center shadow-2xl">
         <h2 className="text-2xl font-bold mb-2">Check Your Gmail</h2>
         <p className="text-sm text-slate-400 mb-6">

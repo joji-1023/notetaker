@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  loginUser, registerUser, 
+  loginUser, registerUser, verifyOtp,
   getNotesByUser, createNote, deleteNote,
   getTasksByUser, createTask, toggleTaskStatus, deleteTask 
 } from './api';
@@ -8,7 +8,7 @@ import {
   Search, LogOut, Trash2, Plus, 
   Lock, User, Mail, CheckCircle2, Circle, Pin, 
   Type, Sun, Moon, Command, Tag, AlertCircle, X, Check, Flame,
-  Calendar, Clock, Filter, ArrowUpDown, Sparkles, CheckCheck
+  Calendar, Clock, Filter, ArrowUpDown, Sparkles, CheckCheck, KeyRound
 } from 'lucide-react';
 import './App.css';
 
@@ -26,6 +26,11 @@ function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [authData, setAuthData] = useState({ username: '', email: '', password: '' });
   const [errorMsg, setErrorMsg] = useState('');
+
+  // OTP Verification State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // App & Theme State
   const [activeTab, setActiveTab] = useState('Today');
@@ -46,9 +51,9 @@ function App() {
   const [taskDueDate, setTaskDueDate] = useState('');
 
   // Filtering & Sorting State
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'completed'
-  const [priorityFilter, setPriorityFilter] = useState('all'); // 'all' | 'high' | 'medium' | 'low'
-  const [sortBy, setSortBy] = useState('dueDate'); // 'dueDate' | 'priority' | 'title'
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('dueDate');
 
   // Note Creator State
   const [newNote, setNewNote] = useState({ 
@@ -103,17 +108,49 @@ function App() {
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsSubmitting(true);
+
     try {
-      const res = isLogin 
-        ? await loginUser({ username: authData.username, password: authData.password }) 
-        : await registerUser(authData);
+      if (isLogin) {
+        const res = await loginUser({ username: authData.username, password: authData.password });
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('userId', res.data.userId);
+        setUserId(res.data.userId);
+        showToast('Welcome back!', 'success');
+      } else {
+        const res = await registerUser(authData);
+        setShowOtpModal(true);
+        showToast(res.data?.message || 'OTP code sent to your email!', 'info');
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || (isLogin ? 'Invalid credentials.' : 'Registration failed.'));
+      showToast('Auth error', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    if (otpCode.trim().length !== 6) {
+      setErrorMsg('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await verifyOtp({ email: authData.email, otp: otpCode.trim() });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('userId', res.data.userId);
       setUserId(res.data.userId);
-      showToast(isLogin ? 'Welcome back!' : 'Account registered!', 'success');
+      setShowOtpModal(false);
+      showToast('Account verified successfully!', 'success');
     } catch (err) {
-      setErrorMsg(isLogin ? 'Invalid credentials.' : 'Registration failed.');
-      showToast('Auth error', 'error');
+      setErrorMsg(err.response?.data?.message || 'Invalid or expired OTP code.');
+      showToast('OTP Verification failed', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -286,13 +323,16 @@ function App() {
       <div className="app-layout auth-layout">
         <div className="ambient-orb orb-1"></div>
         <div className="ambient-orb orb-2"></div>
+        
         <div className="auth-card glass-panel">
           <div className="auth-header">
             <div className="brand-badge"><Command size={22} /></div>
             <h1 className="auth-title">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
             <p className="auth-subtitle">NoteTaker Pro — VisionOS</p>
           </div>
+
           {errorMsg && <div className="auth-error-chip">{errorMsg}</div>}
+
           <form onSubmit={handleAuthSubmit} className="auth-form">
             <div className="input-field-group">
               <User size={16} className="field-icon" />
@@ -326,14 +366,52 @@ function App() {
                 required 
               />
             </div>
-            <button type="submit" className="glass-btn primary-btn full-btn">
-              {isLogin ? 'Sign In' : 'Create ID'}
+            <button type="submit" disabled={isSubmitting} className="glass-btn primary-btn full-btn">
+              {isSubmitting ? 'Processing...' : isLogin ? 'Sign In' : 'Create ID'}
             </button>
           </form>
-          <button className="text-toggle-btn" onClick={() => setIsLogin(!isLogin)}>
+
+          <button className="text-toggle-btn" onClick={() => { setIsLogin(!isLogin); setErrorMsg(''); }}>
             {isLogin ? "Don't have an account? Register" : 'Already registered? Sign in'}
           </button>
         </div>
+
+        {/* OTP Verification Glass Modal */}
+        {showOtpModal && (
+          <div className="cmdk-backdrop" style={{ zIndex: 1000 }}>
+            <div className="auth-card glass-panel" style={{ maxWidth: '380px', width: '100%' }}>
+              <div className="auth-header">
+                <div className="brand-badge"><Mail size={22} /></div>
+                <h1 className="auth-title">Verify Email</h1>
+                <p className="auth-subtitle">Enter 6-digit OTP code sent to <br/><strong style={{ color: '#818cf8' }}>{authData.email}</strong></p>
+              </div>
+
+              {errorMsg && <div className="auth-error-chip">{errorMsg}</div>}
+
+              <form onSubmit={handleVerifyOtp} className="auth-form">
+                <div className="input-field-group">
+                  <KeyRound size={16} className="field-icon" />
+                  <input 
+                    type="text" 
+                    maxLength="6"
+                    placeholder="000000" 
+                    value={otpCode} 
+                    onChange={(e) => setOtpCode(e.target.value)} 
+                    style={{ textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.3rem', fontWeight: 'bold' }}
+                    required 
+                  />
+                </div>
+                <button type="submit" disabled={isSubmitting} className="glass-btn primary-btn full-btn">
+                  {isSubmitting ? 'Verifying...' : 'Verify & Sign In'}
+                </button>
+              </form>
+
+              <button className="text-toggle-btn" onClick={() => { setShowOtpModal(false); setErrorMsg(''); }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
