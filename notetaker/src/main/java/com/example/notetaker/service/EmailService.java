@@ -1,55 +1,42 @@
 package com.example.notetaker.service;
 
-import jakarta.mail.internet.MimeMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
 
 @Service
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${resend.api.key}")
+    private String resendApiKey;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    @Async
-    public void sendOtpEmail(String toEmail, String otpCode) {
-        String body = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #ffffff; border-radius: 10px;'>" +
-                "<h2 style='color: #6366f1;'>Verify Your NoteTaker Account</h2>" +
-                "<p>Use the following 6-digit verification code to complete your signup:</p>" +
-                "<h1 style='background-color: #1e293b; letter-spacing: 5px; color: #38bdf8; text-align: center; padding: 10px; border-radius: 8px;'>" + otpCode + "</h1>" +
-                "<p>This code expires in 10 minutes.</p>" +
-                "</div>";
-        sendHtmlEmail(toEmail, "NoteTaker OTP Verification Code", body);
-    }
+    public void sendOtpEmail(String toEmail, String otp) {
+        String url = "https://api.resend.com/emails";
 
-    @Async
-    public void sendResetPasswordEmail(String toEmail, String resetToken) {
-        String resetLink = "https://notetaker-khaki.vercel.app/reset-password?token=" + resetToken;
-        String body = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #ffffff; border-radius: 10px;'>" +
-                "<h2 style='color: #6366f1;'>Reset Your NoteTaker Password</h2>" +
-                "<p>Click the button below to reset your password:</p>" +
-                "<div style='text-align: center; margin: 25px 0;'>" +
-                "<a href='" + resetLink + "' style='padding: 12px 24px; background-color: #6366f1; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;'>Reset Password</a>" +
-                "</div>" +
-                "<p>If you did not request a password reset, you can safely ignore this email.</p>" +
-                "</div>";
-        sendHtmlEmail(toEmail, "NoteTaker Password Reset Request", body);
-    }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(resendApiKey);
 
-    private void sendHtmlEmail(String toEmail, String subject, String body) {
+        Map<String, Object> body = Map.of(
+                "from", "onboarding@resend.dev",
+                "to", toEmail,
+                "subject", "Your OTP Code",
+                "html", "<p>Your OTP code is: <strong>" + otp + "</strong></p>"
+        );
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(body, true);
-            mailSender.send(message);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            System.out.println("Email sent successfully via Resend: " + response.getBody());
         } catch (Exception e) {
-            System.err.println("Failed to send async email to " + toEmail + ": " + e.getMessage());
+            System.err.println("Failed to send email via Resend API: " + e.getMessage());
+            throw new RuntimeException("Failed to send OTP email: " + e.getMessage());
         }
     }
 }
