@@ -3,6 +3,7 @@ package com.example.notetaker.service;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -14,6 +15,7 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    @Async
     public void sendOtpEmail(String toEmail, String otpCode) {
         String body = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #ffffff; border-radius: 10px;'>" +
                 "<h2 style='color: #6366f1;'>Verify Your NoteTaker Account</h2>" +
@@ -24,6 +26,7 @@ public class EmailService {
         sendHtmlEmail(toEmail, "NoteTaker OTP Verification Code", body);
     }
 
+    @Async
     public void sendResetPasswordEmail(String toEmail, String resetToken) {
         String resetLink = "https://notetaker-khaki.vercel.app/reset-password?token=" + resetToken;
         String body = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #0f172a; color: #ffffff; border-radius: 10px;'>" +
@@ -46,7 +49,7 @@ public class EmailService {
             helper.setText(body, true);
             mailSender.send(message);
         } catch (Exception e) {
-            throw new RuntimeException("Email delivery failed: " + e.getMessage());
+            System.err.println("Failed to send async email to " + toEmail + ": " + e.getMessage());
         }
     }
 }
