@@ -976,3 +976,173 @@ svg {
 
 @keyframes pulseScale { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.15); opacity: 1; } }
 @keyframes loadFill { 0% { transform: translateX(-100%); } 100% { transform: translateX(0); } }
+/* ==========================================================================
+   9. AVATARS (iPhone Contacts-card style)
+   ========================================================================== */
+.avatar-circle {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+.avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+.avatar-nav-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: var(--spring-transition);
+}
+.avatar-nav-btn:hover { transform: scale(1.08); }
+.avatar-nav-btn:active { transform: scale(0.95); }
+
+/* ==========================================================================
+   10. PROFILE MODAL
+   ========================================================================== */
+.profile-modal { max-width: 380px; width: 100%; align-items: center; display: flex; flex-direction: column; }
+.profile-modal .auth-form { width: 100%; }
+
+.avatar-upload-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 8px auto 12px;
+}
+.avatar-edit-btn {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid var(--bg-color);
+  transition: var(--spring-transition);
+}
+.avatar-edit-btn:hover { transform: scale(1.12); }
+
+.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-color);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 4px auto 0;
+  display: block;
+  text-align: center;
+  transition: var(--spring-transition);
+}
+.link-btn:hover { opacity: 0.75; }
+
+/* ==========================================================================
+   11. EDIT NOTE MODAL
+   ========================================================================== */
+.edit-note-modal { width: 100%; max-width: 520px; }
+.edit-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.edit-note-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.note-card-actions { display: flex; align-items: center; gap: 2px; }
+.edit-hover-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: var(--spring-transition);
+}
+.note-glass-card:hover .edit-hover-btn { opacity: 1; }
+.edit-hover-btn:hover { color: var(--accent-color); background: var(--glass-hover-bg); }
+
+/* ==========================================================================
+   12. ENTRANCE ANIMATIONS & SPRING POLISH (iOS/macOS-style)
+   ========================================================================== */
+@keyframes modalPopIn {
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-pop-in { animation: modalPopIn 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes fadeSlideUp {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.dashboard-grid { animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.note-glass-card, .task-glass-row {
+  animation: fadeSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.notes-masonry-grid .note-glass-card:nth-child(1) { animation-delay: 0.02s; }
+.notes-masonry-grid .note-glass-card:nth-child(2) { animation-delay: 0.06s; }
+.notes-masonry-grid .note-glass-card:nth-child(3) { animation-delay: 0.10s; }
+.notes-masonry-grid .note-glass-card:nth-child(4) { animation-delay: 0.14s; }
+.notes-masonry-grid .note-glass-card:nth-child(5) { animation-delay: 0.18s; }
+.notes-masonry-grid .note-glass-card:nth-child(n+6) { animation-delay: 0.2s; }
+.task-stack .task-glass-row:nth-child(1) { animation-delay: 0.02s; }
+.task-stack .task-glass-row:nth-child(2) { animation-delay: 0.05s; }
+.task-stack .task-glass-row:nth-child(3) { animation-delay: 0.08s; }
+.task-stack .task-glass-row:nth-child(4) { animation-delay: 0.11s; }
+.task-stack .task-glass-row:nth-child(n+5) { animation-delay: 0.14s; }
+
+/* Smooth cursor-parallax on ambient orbs (transform set via JS on mousemove) */
+.ambient-orb {
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+/* Unify a few key interactive elements onto the shared iOS spring curve */
+.glass-btn, .icon-action-btn, .segment-btn, .chip-filter, .swatch-btn,
+.pin-toggle-btn, .priority-chip, .note-glass-card, .task-glass-row,
+.check-spring-btn, .cmdk-row {
+  transition: var(--spring-transition), background 0.2s ease, color 0.2s ease;
+}
+.check-spring-btn:active { transform: scale(0.85); }
+.glass-btn:active { transform: scale(0.96); }
+
+/* ==========================================================================
+   13. TOAST — richer types + smooth enter/exit
+   ========================================================================== */
+@keyframes toastSlideIn {
+  0% { opacity: 0; transform: translateX(24px) scale(0.95); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+.toast-chip {
+  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.toast-chip.leaving {
+  opacity: 0;
+  transform: translateX(24px) scale(0.96);
+}
+.toast-chip.login { border-color: rgba(10, 132, 255, 0.4); }
+.toast-chip.logout { border-color: rgba(148, 163, 184, 0.4); }
+.toast-chip.note { border-color: rgba(168, 85, 247, 0.4); }
+.toast-chip.task { border-color: rgba(255, 159, 10, 0.4); }

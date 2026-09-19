@@ -1,16 +1,82 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  loginUser, registerUser, verifyOtp,
-  getNotesByUser, createNote, deleteNote,
-  getTasksByUser, createTask, toggleTaskStatus, deleteTask 
+  loginUser, registerUser, verifyOtp, forgotPassword, resetPassword,
+  getNotesByUser, createNote, updateNote, deleteNote,
+  getTasksByUser, createTask, toggleTaskStatus, deleteTask,
+  getUserProfile, updateUserProfile
 } from './api';
 import { 
   Search, LogOut, Trash2, Plus, 
   Lock, User, Mail, CheckCircle2, Circle, Pin, 
   Type, Sun, Moon, Command, Tag, AlertCircle, X, Check, Flame,
-  Calendar, Clock, Filter, ArrowUpDown, Sparkles, CheckCheck, KeyRound
+  Calendar, Clock, Filter, ArrowUpDown, Sparkles, CheckCheck, KeyRound,
+  Camera, Pencil, ArrowLeft, RotateCcw, StickyNote, ListChecks, LogIn
 } from 'lucide-react';
 import './App.css';
+
+// iOS Contacts-style deterministic avatar colors
+const AVATAR_PALETTE = [
+  'linear-gradient(135deg, #ff9f0a, #ff6b00)',
+  'linear-gradient(135deg, #ff453a, #d70015)',
+  'linear-gradient(135deg, #ff375f, #d0004f)',
+  'linear-gradient(135deg, #bf5af2, #8944ab)',
+  'linear-gradient(135deg, #a855f7, #6366f1)',
+  'linear-gradient(135deg, #0a84ff, #0060df)',
+  'linear-gradient(135deg, #64d2ff, #0a84ff)',
+  'linear-gradient(135deg, #30d158, #0a8f3c)',
+  'linear-gradient(135deg, #ffd60a, #ff9f0a)',
+];
+
+const getInitials = (name) => {
+  if (!name) return '?';
+  const parts = name.trim().split(/[\s._-]+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const getAvatarGradient = (name) => {
+  if (!name) return AVATAR_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
+
+// Resize + compress an uploaded image client-side into a small square data URL
+const fileToAvatarDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = reject;
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = reject;
+    img.onload = () => {
+      const SIZE = 200;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(SIZE / img.width, SIZE / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// iPhone Contacts-card style avatar: photo if uploaded, otherwise initials on a color
+function Avatar({ name, avatarUrl, size = 36 }) {
+  const isCustomImage = avatarUrl && avatarUrl.startsWith('data:');
+  const style = { width: size, height: size, fontSize: size * 0.4 };
+  if (isCustomImage) {
+    return <div className="avatar-circle" style={style}><img src={avatarUrl} alt={name} /></div>;
+  }
+  return (
+    <div className="avatar-circle" style={{ ...style, background: getAvatarGradient(name) }}>
+      <span>{getInitials(name)}</span>
+    </div>
+  );
+}
 
 const NOTE_COLORS = [
   { id: 'default', label: 'Glass', color: 'rgba(255, 255, 255, 0.05)' },
@@ -39,6 +105,24 @@ function App() {
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [isCmdKOpen, setIsCmdKOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  // Profile / Avatar State
+  const [profile, setProfile] = useState({ username: '', avatarUrl: '' });
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ username: '', avatarUrl: '' });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Forgot Password State
+  const [forgotPw, setForgotPw] = useState({ step: null, email: '', code: '', newPassword: '', confirmPassword: '' });
+  const [forgotPwError, setForgotPwError] = useState('');
+  const [isForgotSubmitting, setIsForgotSubmitting] = useState(false);
+
+  // Edit Note State
+  const [editingNote, setEditingNote] = useState(null);
+
+  // Parallax refs (direct DOM manipulation — avoids re-render storms on mousemove)
+  const orb1Ref = useRef(null);
+  const orb2Ref = useRef(null);
 
   // Data State
   const [tasks, setTasks] = useState([]);
@@ -83,7 +167,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (userId) fetchData(userId);
+    if (userId) {
+      fetchData(userId);
+      fetchProfile(userId);
+    }
   }, [userId]);
 
   const fetchData = async (id) => {
@@ -96,12 +183,32 @@ function App() {
     }
   };
 
+  const fetchProfile = async (id) => {
+    try {
+      const res = await getUserProfile(id);
+      setProfile({ username: res.data.username || '', avatarUrl: res.data.avatarUrl || '' });
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    }
+  };
+
   const showToast = (message, type = 'info') => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type, leaving: false }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, leaving: true } : t)));
+    }, 2700);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+    }, 3100);
+  };
+
+  // Subtle macOS/iOS-style cursor parallax on the ambient background orbs
+  const handleAmbientParallax = (e) => {
+    const x = e.clientX / window.innerWidth - 0.5;
+    const y = e.clientY / window.innerHeight - 0.5;
+    if (orb1Ref.current) orb1Ref.current.style.transform = `translate3d(${x * 50}px, ${y * 50}px, 0)`;
+    if (orb2Ref.current) orb2Ref.current.style.transform = `translate3d(${x * -40}px, ${y * -40}px, 0)`;
   };
 
   // Auth Handlers
@@ -116,7 +223,7 @@ function App() {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('userId', res.data.userId);
         setUserId(res.data.userId);
-        showToast('Welcome back!', 'success');
+        showToast('Welcome back!', 'login');
       } else {
         const res = await registerUser(authData);
         setShowOtpModal(true);
@@ -159,7 +266,90 @@ function App() {
     setUserId(null);
     setTasks([]);
     setNotes([]);
-    showToast('Logged out');
+    setProfile({ username: '', avatarUrl: '' });
+    showToast('Logged out', 'logout');
+  };
+
+  // Forgot Password Handlers
+  const openForgotPassword = () => {
+    setForgotPwError('');
+    setForgotPw({ step: 'request', email: authData.email || '', code: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const closeForgotPassword = () => {
+    setForgotPw({ step: null, email: '', code: '', newPassword: '', confirmPassword: '' });
+    setForgotPwError('');
+  };
+
+  const handleForgotPasswordRequest = async (e) => {
+    e.preventDefault();
+    setForgotPwError('');
+    setIsForgotSubmitting(true);
+    try {
+      const res = await forgotPassword(forgotPw.email);
+      setForgotPw((prev) => ({ ...prev, step: 'reset' }));
+      showToast(res.data?.message || 'Reset code sent to your email', 'info');
+    } catch (err) {
+      setForgotPwError(err.response?.data?.message || 'Could not send reset code.');
+    } finally {
+      setIsForgotSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setForgotPwError('');
+    if (forgotPw.newPassword.length < 6) {
+      setForgotPwError('Password must be at least 6 characters.');
+      return;
+    }
+    if (forgotPw.newPassword !== forgotPw.confirmPassword) {
+      setForgotPwError('Passwords do not match.');
+      return;
+    }
+    setIsForgotSubmitting(true);
+    try {
+      await resetPassword({ email: forgotPw.email, code: forgotPw.code.trim(), newPassword: forgotPw.newPassword });
+      showToast('Password reset — please sign in', 'success');
+      closeForgotPassword();
+      setIsLogin(true);
+      setAuthData({ username: '', email: forgotPw.email, password: '' });
+    } catch (err) {
+      setForgotPwError(err.response?.data?.message || 'Invalid or expired reset code.');
+    } finally {
+      setIsForgotSubmitting(false);
+    }
+  };
+
+  // Profile Handlers
+  const openProfileModal = () => {
+    setProfileDraft({ username: profile.username, avatarUrl: profile.avatarUrl });
+    setShowProfileModal(true);
+  };
+
+  const handleAvatarFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      setProfileDraft((prev) => ({ ...prev, avatarUrl: dataUrl }));
+    } catch (err) {
+      showToast('Could not process that image', 'error');
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const res = await updateUserProfile(userId, profileDraft);
+      setProfile({ username: res.data.username, avatarUrl: res.data.avatarUrl || '' });
+      setShowProfileModal(false);
+      showToast('Profile updated', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Could not update profile', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   // Task Handlers
@@ -180,7 +370,7 @@ function App() {
       setTasks((prev) => [res.data, ...prev]);
       setNewTaskTitle('');
       setTaskDueDate('');
-      showToast('Task added successfully', 'success');
+      showToast('Task added successfully', 'task');
     } catch (err) {
       const fallbackTask = { id: Date.now(), ...payload };
       setTasks((prev) => [fallbackTask, ...prev]);
@@ -230,7 +420,7 @@ function App() {
       setNewNote({ title: '', content: '', fontFamily: 'System', color: 'default', isPinned: false });
       const res = await getNotesByUser(userId);
       setNotes(res.data || []);
-      showToast('Note saved', 'success');
+      showToast('Note saved', 'note');
     } catch (err) {
       const fallbackNote = { id: Date.now(), ...newNote };
       setNotes((prev) => [fallbackNote, ...prev]);
@@ -239,11 +429,36 @@ function App() {
     }
   };
 
+  const openEditNote = (note) => setEditingNote({ ...note });
+  const closeEditNote = () => setEditingNote(null);
+
+  const handleUpdateNote = async (e) => {
+    e.preventDefault();
+    if (!editingNote) return;
+    const payload = {
+      title: editingNote.title,
+      content: editingNote.content,
+      fontFamily: editingNote.fontFamily,
+      color: editingNote.color,
+      isPinned: editingNote.isPinned,
+    };
+    try {
+      const res = await updateNote(editingNote.id, userId, payload);
+      setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? res.data : n)));
+      showToast('Note updated', 'note');
+    } catch (err) {
+      setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? { ...n, ...payload } : n)));
+      showToast('Note updated locally', 'info');
+    } finally {
+      closeEditNote();
+    }
+  };
+
   const handleDeleteNote = async (noteId) => {
     try {
       await deleteNote(noteId, userId);
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      showToast('Note deleted');
+      showToast('Note deleted', 'note');
     } catch (err) {
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
       showToast('Note deleted locally');
@@ -320,11 +535,11 @@ function App() {
 
   if (!userId) {
     return (
-      <div className="app-layout auth-layout">
-        <div className="ambient-orb orb-1"></div>
-        <div className="ambient-orb orb-2"></div>
+      <div className="app-layout auth-layout" onMouseMove={handleAmbientParallax}>
+        <div className="ambient-orb orb-1" ref={orb1Ref}></div>
+        <div className="ambient-orb orb-2" ref={orb2Ref}></div>
         
-        <div className="auth-card glass-panel">
+        <div className="auth-card glass-panel modal-pop-in">
           <div className="auth-header">
             <div className="brand-badge"><Command size={22} /></div>
             <h1 className="auth-title">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
@@ -371,6 +586,12 @@ function App() {
             </button>
           </form>
 
+          {isLogin && (
+            <button className="link-btn" onClick={openForgotPassword}>
+              Forgot password?
+            </button>
+          )}
+
           <button className="text-toggle-btn" onClick={() => { setIsLogin(!isLogin); setErrorMsg(''); }}>
             {isLogin ? "Don't have an account? Register" : 'Already registered? Sign in'}
           </button>
@@ -412,14 +633,106 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Forgot Password Modal */}
+        {forgotPw.step && (
+          <div className="cmdk-backdrop" style={{ zIndex: 1000 }}>
+            <div className="auth-card glass-panel modal-pop-in" style={{ maxWidth: '380px', width: '100%' }}>
+              {forgotPw.step === 'request' ? (
+                <>
+                  <div className="auth-header">
+                    <div className="brand-badge"><KeyRound size={22} /></div>
+                    <h1 className="auth-title">Reset Password</h1>
+                    <p className="auth-subtitle">Enter your account email and we'll send you a reset code.</p>
+                  </div>
+
+                  {forgotPwError && <div className="auth-error-chip">{forgotPwError}</div>}
+
+                  <form onSubmit={handleForgotPasswordRequest} className="auth-form">
+                    <div className="input-field-group">
+                      <Mail size={16} className="field-icon" />
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={forgotPw.email}
+                        onChange={(e) => setForgotPw({ ...forgotPw, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <button type="submit" disabled={isForgotSubmitting} className="glass-btn primary-btn full-btn">
+                      {isForgotSubmitting ? 'Sending...' : 'Send Reset Code'}
+                    </button>
+                  </form>
+
+                  <button className="text-toggle-btn" onClick={closeForgotPassword}>
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="auth-header">
+                    <div className="brand-badge"><Lock size={22} /></div>
+                    <h1 className="auth-title">Set New Password</h1>
+                    <p className="auth-subtitle">Enter the code sent to <br/><strong style={{ color: '#818cf8' }}>{forgotPw.email}</strong></p>
+                  </div>
+
+                  {forgotPwError && <div className="auth-error-chip">{forgotPwError}</div>}
+
+                  <form onSubmit={handleResetPassword} className="auth-form">
+                    <div className="input-field-group">
+                      <KeyRound size={16} className="field-icon" />
+                      <input
+                        type="text"
+                        maxLength="6"
+                        placeholder="000000"
+                        value={forgotPw.code}
+                        onChange={(e) => setForgotPw({ ...forgotPw, code: e.target.value })}
+                        style={{ textAlign: 'center', fontSize: '1.4rem', letterSpacing: '0.3rem', fontWeight: 'bold' }}
+                        required
+                      />
+                    </div>
+                    <div className="input-field-group">
+                      <Lock size={16} className="field-icon" />
+                      <input
+                        type="password"
+                        placeholder="New Password"
+                        value={forgotPw.newPassword}
+                        onChange={(e) => setForgotPw({ ...forgotPw, newPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="input-field-group">
+                      <Lock size={16} className="field-icon" />
+                      <input
+                        type="password"
+                        placeholder="Confirm New Password"
+                        value={forgotPw.confirmPassword}
+                        onChange={(e) => setForgotPw({ ...forgotPw, confirmPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <button type="submit" disabled={isForgotSubmitting} className="glass-btn primary-btn full-btn">
+                      {isForgotSubmitting ? 'Resetting...' : 'Reset Password'}
+                    </button>
+                  </form>
+
+                  <button className="text-toggle-btn" onClick={() => setForgotPw((prev) => ({ ...prev, step: 'request' }))}>
+                    <ArrowLeft size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                    Back
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="app-layout">
-      <div className="ambient-orb orb-1"></div>
-      <div className="ambient-orb orb-2"></div>
+    <div className="app-layout" onMouseMove={handleAmbientParallax}>
+      <div className="ambient-orb orb-1" ref={orb1Ref}></div>
+      <div className="ambient-orb orb-2" ref={orb2Ref}></div>
 
       {/* Dynamic Navbar */}
       <header className="mac-nav-wrapper">
@@ -455,6 +768,10 @@ function App() {
 
             <button className="icon-action-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
+            <button className="avatar-nav-btn" onClick={openProfileModal} title="Profile">
+              <Avatar name={profile.username} avatarUrl={profile.avatarUrl} size={30} />
             </button>
 
             <button className="icon-action-btn logout-danger" onClick={handleLogout}>
@@ -736,13 +1053,22 @@ function App() {
                     <div className="note-card-header">
                       <span className="font-badge">{note.fontFamily || 'System'}</span>
                       {note.isPinned && <span className="pin-badge"><Pin size={12} /> Pinned</span>}
-                      <button 
-                        type="button" 
-                        className="delete-hover-btn" 
-                        onClick={() => handleDeleteNote(note.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="note-card-actions">
+                        <button 
+                          type="button" 
+                          className="edit-hover-btn" 
+                          onClick={() => openEditNote(note)}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button 
+                          type="button" 
+                          className="delete-hover-btn" 
+                          onClick={() => handleDeleteNote(note.id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     {note.title && <h3 className="note-card-title">{note.title}</h3>}
@@ -791,14 +1117,157 @@ function App() {
         </div>
       )}
 
+      {/* Edit Note Modal */}
+      {editingNote && (
+        <div className="cmdk-backdrop" onClick={closeEditNote}>
+          <form
+            className="note-composer-card glass-panel modal-pop-in edit-note-modal"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleUpdateNote}
+          >
+            <div className="edit-note-header">
+              <h3><Pencil size={15} /> Edit Note</h3>
+              <button type="button" className="cmdk-close-btn" onClick={closeEditNote}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Note Title"
+              className="composer-title-input"
+              value={editingNote.title || ''}
+              onChange={(e) => setEditingNote({ ...editingNote, title: e.target.value })}
+            />
+            <textarea
+              placeholder="Write your thoughts..."
+              className="composer-textarea"
+              rows={5}
+              value={editingNote.content || ''}
+              onChange={(e) => setEditingNote({ ...editingNote, content: e.target.value })}
+            />
+
+            <div className="composer-toolbar">
+              <div className="segmented-font-picker">
+                <Type size={14} className="picker-icon" />
+                {['System', 'Serif', 'Mono'].map((font) => (
+                  <button
+                    key={font}
+                    type="button"
+                    className={`font-option ${editingNote.fontFamily === font ? 'selected' : ''}`}
+                    onClick={() => setEditingNote({ ...editingNote, fontFamily: font })}
+                  >
+                    {font}
+                  </button>
+                ))}
+              </div>
+
+              <div className="color-swatch-row">
+                {NOTE_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`swatch-btn ${editingNote.color === c.id ? 'active' : ''}`}
+                    style={{ background: c.color }}
+                    onClick={() => setEditingNote({ ...editingNote, color: c.id })}
+                  />
+                ))}
+              </div>
+
+              <div className="toolbar-right">
+                <button
+                  type="button"
+                  className={`pin-toggle-btn ${editingNote.isPinned ? 'pinned' : ''}`}
+                  onClick={() => setEditingNote({ ...editingNote, isPinned: !editingNote.isPinned })}
+                >
+                  <Pin size={14} /> {editingNote.isPinned ? 'Pinned' : 'Pin'}
+                </button>
+
+                <button type="submit" className="glass-btn primary-btn">
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Profile Modal */}
+      {showProfileModal && (
+        <div className="cmdk-backdrop" onClick={() => setShowProfileModal(false)}>
+          <div className="auth-card glass-panel modal-pop-in profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="auth-header">
+              <h1 className="auth-title">Your Profile</h1>
+              <p className="auth-subtitle">Update your name and photo</p>
+            </div>
+
+            <div className="avatar-upload-wrap">
+              <Avatar name={profileDraft.username} avatarUrl={profileDraft.avatarUrl} size={96} />
+              <label className="avatar-edit-btn" title="Upload photo">
+                <Camera size={15} />
+                <input type="file" accept="image/*" hidden onChange={handleAvatarFileChange} />
+              </label>
+            </div>
+
+            {profileDraft.avatarUrl && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setProfileDraft((prev) => ({ ...prev, avatarUrl: '' }))}
+              >
+                <RotateCcw size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                Use Initials Avatar
+              </button>
+            )}
+
+            <div className="auth-form" style={{ marginTop: 8 }}>
+              <div className="input-field-group">
+                <User size={16} className="field-icon" />
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={profileDraft.username}
+                  onChange={(e) => setProfileDraft({ ...profileDraft, username: e.target.value })}
+                />
+              </div>
+
+              <div className="toolbar-right" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
+                <button type="button" className="text-toggle-btn" onClick={() => setShowProfileModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingProfile}
+                  className="glass-btn primary-btn"
+                  onClick={handleSaveProfile}
+                >
+                  {isSavingProfile ? 'Saving...' : 'Save Profile'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notifications */}
       <div className="toast-container">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast-chip glass-panel ${t.type}`}>
-            {t.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
-            <span>{t.message}</span>
-          </div>
-        ))}
+        {toasts.map((t) => {
+          const icons = {
+            success: <Check size={14} />,
+            error: <AlertCircle size={14} />,
+            login: <LogIn size={14} />,
+            logout: <LogOut size={14} />,
+            note: <StickyNote size={14} />,
+            task: <ListChecks size={14} />,
+            info: <Sparkles size={14} />,
+          };
+          return (
+            <div key={t.id} className={`toast-chip glass-panel ${t.type} ${t.leaving ? 'leaving' : ''}`}>
+              {icons[t.type] || <Check size={14} />}
+              <span>{t.message}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

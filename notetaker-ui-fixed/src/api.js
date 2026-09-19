@@ -25,6 +25,9 @@ api.interceptors.request.use(
 // Authentication Endpoints
 export const loginUser = (credentials) => api.post('/auth/login', credentials);
 export const registerUser = (userData) => api.post('/auth/register', userData);
+export const verifyOtp = (otpData) => api.post('/auth/verify-otp', otpData);
+export const forgotPassword = (email) => api.post('/auth/forgot-password', { email });
+export const resetPassword = (payload) => api.post('/auth/reset-password', payload);
 
 // Task Operations
 export const getTasksByUser = (userId) => api.get(`/tasks/user/${userId}`);
@@ -35,6 +38,11 @@ export const deleteTask = (taskId) => api.delete(`/tasks/${taskId}`);
 // Note Operations
 export const getNotesByUser = (userId) => api.get(`/notes/user/${userId}`);
 export const createNote = (userId, noteData) => api.post(`/notes/user/${userId}`, noteData);
-export const deleteNote = (noteId, userId) => api.delete(`/notes/${noteId}?userId=${userId}`);
-export const verifyOtp = (otpData) => api.post('/auth/verify-otp', otpData);
+export const updateNote = (noteId, userId, noteData) => api.put(`/notes/${noteId}/user/${userId}`, noteData);
+export const deleteNote = (noteId, userId) => api.delete(`/notes/${noteId}/user/${userId}`);
+
+// Profile Operations
+export const getUserProfile = (userId) => api.get(`/users/${userId}`);
+export const updateUserProfile = (userId, payload) => api.put(`/users/${userId}/profile`, payload);
+
 export default api;

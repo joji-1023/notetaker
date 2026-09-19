@@ -25,4 +25,14 @@ public class UserController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PutMapping("/{id}/profile")
+    public ResponseEntity<?> updateProfile(@PathVariable Long id, @RequestBody java.util.Map<String, String> request) {
+        try {
+            User updated = userService.updateProfile(id, request.get("username"), request.get("avatarUrl"));
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage(), "message", e.getMessage()));
+        }
+    }
 }

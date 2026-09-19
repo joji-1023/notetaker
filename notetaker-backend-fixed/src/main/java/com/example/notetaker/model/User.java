@@ -1,5 +1,6 @@
 package com.example.notetaker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -17,21 +18,26 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
     @Column(name = "is_verified", nullable = false, columnDefinition = "boolean default false")
     private boolean isVerified = false;
 
+    @JsonIgnore
     @Column(name = "otp_code")
     private String otpCode;
 
+    @JsonIgnore
     @Column(name = "otp_expiry")
     private LocalDateTime otpExpiry;
 
+    @JsonIgnore
     @Column(name = "reset_token")
     private String resetToken;
 
+    @JsonIgnore
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 

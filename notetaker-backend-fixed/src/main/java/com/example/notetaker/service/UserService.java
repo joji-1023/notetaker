@@ -26,4 +26,22 @@ public class UserService {
     public Optional<User> getUserById(Long id) {
         return userRepository.findById(id);
     }
+
+    public User updateProfile(Long id, String username, String avatarUrl) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (username != null && !username.isBlank() && !username.equals(user.getUsername())) {
+            if (userRepository.existsByUsername(username)) {
+                throw new RuntimeException("Username already taken");
+            }
+            user.setUsername(username);
+        }
+
+        if (avatarUrl != null) {
+            user.setAvatarUrl(avatarUrl);
+        }
+
+        return userRepository.save(user);
+    }
 }

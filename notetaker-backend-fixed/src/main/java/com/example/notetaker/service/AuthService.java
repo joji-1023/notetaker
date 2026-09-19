@@ -121,6 +121,46 @@ public class AuthService {
         return result;
     }
 
+    public String forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("No account found with that email"));
+
+        String code = generateOtp();
+        user.setResetToken(code);
+        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(10));
+        userRepository.save(user);
+
+        emailService.sendPasswordResetEmail(user.getEmail(), code);
+        return "Password reset code sent to your email";
+    }
+
+    public String resetPassword(String email, String code, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("No account found with that email"));
+
+        String cleanedEntered = code != null ? code.trim() : "";
+        String storedCode = user.getResetToken() != null ? user.getResetToken().trim() : "";
+
+        if (storedCode.isEmpty() || !storedCode.equals(cleanedEntered)) {
+            throw new RuntimeException("Invalid reset code");
+        }
+
+        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Reset code has expired");
+        }
+
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new RuntimeException("Password must be at least 6 characters");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        return "Password reset successfully";
+    }
+
     private String generateOtp() {
         Random random = new Random();
         int otp = 100000 + random.nextInt(900000);
