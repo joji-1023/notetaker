@@ -38,6 +38,7 @@ public class NoteService {
         note.setFontFamily(noteDetails.getFontFamily());
         note.setFontSize(noteDetails.getFontSize());
         note.setIsPinned(noteDetails.getIsPinned());
+        if (noteDetails.getColor() != null) note.setColor(noteDetails.getColor());
 
         return noteRepository.save(note);
     }

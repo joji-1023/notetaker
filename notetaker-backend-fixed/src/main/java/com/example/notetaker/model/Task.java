@@ -1,10 +1,13 @@
 package com.example.notetaker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
 @Entity
 @Table(name = "tasks")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Task {
 
     @Id
@@ -24,6 +27,7 @@ public class Task {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     public Task() {}
