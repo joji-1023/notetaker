@@ -1,8 +1,7 @@
 package com.example.notetaker.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -23,7 +22,11 @@ public class Note {
 
     private String fontFamily = "Inter";
     private Integer fontSize = 14;
+
+    @JsonProperty("isPinned")
     private Boolean isPinned = false;
+
+    private String color = "default";
 
     // Strict user isolation link: Every note belongs to exactly one user
     @ManyToOne(fetch = FetchType.LAZY)
@@ -70,6 +73,9 @@ public class Note {
 
     public Boolean getIsPinned() { return isPinned; }
     public void setIsPinned(Boolean isPinned) { this.isPinned = isPinned; }
+
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
 
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
