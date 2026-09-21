@@ -41,7 +41,7 @@ public class User {
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
-    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    @Column(name = "avatar_url", columnDefinition = "MEDIUMTEXT")
     private String avatarUrl = "https://api.dicebear.com/7.x/bottts/svg?seed=Vision1";
 
     @Column(name = "created_at")
