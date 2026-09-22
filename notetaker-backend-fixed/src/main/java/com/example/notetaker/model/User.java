@@ -1,6 +1,7 @@
 package com.example.notetaker.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -18,7 +19,14 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @JsonIgnore
+    // WRITE_ONLY (not @JsonIgnore): the client must be able to SEND a
+    // password when registering/resetting, it just must never be sent BACK
+    // in a response. Plain @JsonIgnore blocks both directions, which was
+    // silently dropping the incoming password on every registration attempt
+    // -- the request always deserialized with password = null, so
+    // passwordEncoder.encode(null) threw "rawPassword cannot be null" no
+    // matter what the client actually typed.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(nullable = false)
     private String password;
 
