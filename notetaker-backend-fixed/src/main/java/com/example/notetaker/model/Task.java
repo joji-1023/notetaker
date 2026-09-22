@@ -1,5 +1,6 @@
 package com.example.notetaker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -22,6 +23,14 @@ public class Task {
 
     private LocalDate dueDate;
 
+    // Not serialized: the client never needs the owning user embedded here,
+    // and because this is a lazy Hibernate relation, letting Jackson touch it
+    // without this annotation serializes the raw proxy's internal fields
+    // (hibernateLazyInitializer/handler) instead of real data -- producing
+    // broken JSON ("Could not load tasks: Expected ':' ... path $[0].user").
+    // Note.java avoided this with @JsonIgnoreProperties on the class; this
+    // does the same job more directly by never touching the proxy at all.
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

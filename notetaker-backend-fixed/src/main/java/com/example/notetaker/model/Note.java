@@ -1,5 +1,6 @@
 package com.example.notetaker.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -28,10 +29,14 @@ public class Note {
 
     private String color = "default";
 
-    // Strict user isolation link: Every note belongs to exactly one user
+    // Not serialized: same reasoning as Task.java -- the client (web + Android)
+    // never reads this, and skipping serialization entirely is more robust
+    // than relying on the class-level hibernateLazyInitializer/handler ignore
+    // above, which only hides the proxy internals but still risks touching
+    // the lazy proxy during serialization.
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties("notes") // Manages the parent side of the relationship
     private User user;
 
     private LocalDateTime createdAt;
