@@ -1,23 +1,23 @@
 package com.example.notetaker.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.mail.internet.MimeMessage;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${sendgrid.api.key}")
+    private String sendGridApiKey;
 
-    @Value("${spring.mail.username}")
+    @Value("${sendgrid.from.email}")
     private String fromEmail;
 
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public void sendOtpEmail(String toEmail, String otp) {
         send(toEmail, "Your OTP Code",
@@ -31,18 +31,32 @@ public class EmailService {
     }
 
     private void send(String toEmail, String subject, String html) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(html, true); // true = HTML content
+        String url = "https://api.sendgrid.com/v3/mail/send";
 
-            mailSender.send(message);
-            System.out.println("Email sent successfully via Gmail SMTP to: " + toEmail);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(sendGridApiKey);
+
+        // SendGrid v3 Mail Send API request body
+        Map<String, Object> body = Map.of(
+                "personalizations", List.of(
+                        Map.of("to", List.of(Map.of("email", toEmail)))
+                ),
+                "from", Map.of("email", fromEmail, "name", "NoteTaker"),
+                "subject", subject,
+                "content", List.of(
+                        Map.of("type", "text/html", "value", html)
+                )
+        );
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        try {
+            // SendGrid returns 202 Accepted with an empty body on success
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            System.out.println("Email sent successfully via SendGrid. Status: " + response.getStatusCode());
         } catch (Exception e) {
-            System.err.println("Failed to send email via Gmail SMTP: " + e.getMessage());
+            System.err.println("Failed to send email via SendGrid API: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Failed to send email: " + e.getMessage());
         }
