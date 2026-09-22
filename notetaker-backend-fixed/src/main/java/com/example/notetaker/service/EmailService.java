@@ -31,6 +31,15 @@ public class EmailService {
     }
 
     private void send(String toEmail, String subject, String html) {
+        if (sendGridApiKey == null || sendGridApiKey.isBlank()) {
+            throw new RuntimeException(
+                "SENDGRID_API_KEY is not set on the server. Add it in Render → Environment and redeploy.");
+        }
+        if (fromEmail == null || fromEmail.isBlank()) {
+            throw new RuntimeException(
+                "SENDGRID_FROM_EMAIL is not set on the server. Add it in Render → Environment and redeploy.");
+        }
+
         String url = "https://api.sendgrid.com/v3/mail/send";
 
         HttpHeaders headers = new HttpHeaders();
