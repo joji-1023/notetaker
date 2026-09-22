@@ -6,6 +6,12 @@ const API_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL.replace(
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  // Render's free tier spins the backend down after idling and can take
+  // 30-60s to wake back up on the next request. A short timeout here made
+  // that first request fail right after login/reload, which upstream code
+  // was silently treating as "offline, keep working locally" -- which is
+  // why data appeared to vanish. Give cold starts room to finish.
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,15 +28,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// If the JWT has expired/invalid, force a clean re-login instead of silently showing empty data
+// Automatically retries idempotent (GET) requests once after a short delay.
+// This absorbs Render cold-start failures (backend waking up) instead of
+// surfacing an empty/blank state to the user.
 api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    const status = error.response?.status;
-    const url = error.config?.url || '';
-    if ((status === 401 || status === 403) && !url.startsWith('/auth/') && localStorage.getItem('token')) {
-      localStorage.clear();
-      window.location.reload();
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    const isGet = config && (config.method || 'get').toLowerCase() === 'get';
+    const isNetworkOrTimeout = !error.response; // no response = timeout/network/cold-start
+    if (isGet && isNetworkOrTimeout && !config._retried) {
+      config._retried = true;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return api(config);
     }
     return Promise.reject(error);
   }

@@ -173,13 +173,24 @@ function App() {
     }
   }, [userId]);
 
-  const fetchData = async (id) => {
-    // Load notes and tasks independently so one failing request can't blank out the other
-    const [notesRes, tasksRes] = await Promise.allSettled([getNotesByUser(id), getTasksByUser(id)]);
-    if (notesRes.status === 'fulfilled') setNotes(notesRes.value.data || []);
-    else console.error('Failed to fetch notes:', notesRes.reason);
-    if (tasksRes.status === 'fulfilled') setTasks(tasksRes.value.data || []);
-    else console.error('Failed to fetch tasks:', tasksRes.reason);
+  const fetchData = async (id, isRetry = false) => {
+    try {
+      const [notesRes, tasksRes] = await Promise.all([getNotesByUser(id), getTasksByUser(id)]);
+      setNotes(notesRes.data || []);
+      setTasks(tasksRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+      // Previously this failed silently, leaving notes/tasks empty with no
+      // indication anything went wrong -- indistinguishable from "data was
+      // wiped". Surface it and retry once (handles the backend waking up
+      // from an idle/cold state on Render's free tier).
+      if (!isRetry) {
+        showToast('Could not load your notes/tasks. Retrying...', 'error');
+        setTimeout(() => fetchData(id, true), 4000);
+      } else {
+        showToast('Still unable to reach the server. Pull to refresh or check your connection.', 'error');
+      }
+    }
   };
 
   const fetchProfile = async (id) => {
@@ -371,11 +382,9 @@ function App() {
       setTaskDueDate('');
       showToast('Task added successfully', 'task');
     } catch (err) {
-      const fallbackTask = { id: Date.now(), ...payload };
-      setTasks((prev) => [fallbackTask, ...prev]);
-      setNewTaskTitle('');
-      setTaskDueDate('');
-      showToast('Task added locally', 'info');
+      // Previously faked success with a local-only task (id: Date.now()),
+      // which is why tasks vanished on reload -- they were never saved.
+      showToast(err.response?.data?.message || 'Could not add task. Please try again.', 'error');
     }
   };
 
@@ -384,7 +393,7 @@ function App() {
       const res = await toggleTaskStatus(taskId);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? res.data : t)));
     } catch (err) {
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed: !t.completed } : t)));
+      showToast('Could not update task. Please try again.', 'error');
     }
   };
 
@@ -394,8 +403,7 @@ function App() {
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
       showToast('Task removed');
     } catch (err) {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      showToast('Task removed locally');
+      showToast('Could not delete task. Please try again.', 'error');
     }
   };
 
@@ -421,10 +429,10 @@ function App() {
       setNotes(res.data || []);
       showToast('Note saved', 'note');
     } catch (err) {
-      const fallbackNote = { id: Date.now(), ...newNote };
-      setNotes((prev) => [fallbackNote, ...prev]);
-      setNewNote({ title: '', content: '', fontFamily: 'System', color: 'default', isPinned: false });
-      showToast('Note saved locally', 'info');
+      // NOTE: this used to fake success by adding the note to local state
+      // only, which is exactly why notes disappeared on reload/login -
+      // they were never actually persisted. Now we tell the truth.
+      showToast(err.response?.data?.message || 'Could not save note. Please try again.', 'error');
     }
   };
 
@@ -445,11 +453,12 @@ function App() {
       const res = await updateNote(editingNote.id, userId, payload);
       setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? res.data : n)));
       showToast('Note updated', 'note');
-    } catch (err) {
-      setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? { ...n, ...payload } : n)));
-      showToast('Note updated locally', 'info');
-    } finally {
       closeEditNote();
+    } catch (err) {
+      // Previously this faked a local-only update, which is not what's
+      // actually saved server-side, so it vanished on reload. Keep the
+      // editor open and tell the user it failed instead.
+      showToast(err.response?.data?.message || 'Could not update note. Please try again.', 'error');
     }
   };
 
@@ -459,8 +468,9 @@ function App() {
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
       showToast('Note deleted', 'note');
     } catch (err) {
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      showToast('Note deleted locally');
+      // Don't remove it from the UI if the server-side delete failed --
+      // that made deleted-looking notes reappear after reload.
+      showToast(err.response?.data?.message || 'Could not delete note. Please try again.', 'error');
     }
   };
 

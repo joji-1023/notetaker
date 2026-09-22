@@ -1,6 +1,5 @@
 package com.example.notetaker.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -32,7 +31,7 @@ public class Note {
     // Strict user isolation link: Every note belongs to exactly one user
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnore // Lazy proxy must never be serialized (caused HTTP 500 on GET/PUT)
+    @JsonIgnoreProperties("notes") // Manages the parent side of the relationship
     private User user;
 
     private LocalDateTime createdAt;
