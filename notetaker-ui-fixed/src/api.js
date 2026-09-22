@@ -22,6 +22,20 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// If the JWT has expired/invalid, force a clean re-login instead of silently showing empty data
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    if ((status === 401 || status === 403) && !url.startsWith('/auth/') && localStorage.getItem('token')) {
+      localStorage.clear();
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Authentication Endpoints
 export const loginUser = (credentials) => api.post('/auth/login', credentials);
 export const registerUser = (userData) => api.post('/auth/register', userData);

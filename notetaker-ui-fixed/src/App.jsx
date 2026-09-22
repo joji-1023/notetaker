@@ -174,13 +174,12 @@ function App() {
   }, [userId]);
 
   const fetchData = async (id) => {
-    try {
-      const [notesRes, tasksRes] = await Promise.all([getNotesByUser(id), getTasksByUser(id)]);
-      setNotes(notesRes.data || []);
-      setTasks(tasksRes.data || []);
-    } catch (err) {
-      console.error('Failed to fetch data:', err);
-    }
+    // Load notes and tasks independently so one failing request can't blank out the other
+    const [notesRes, tasksRes] = await Promise.allSettled([getNotesByUser(id), getTasksByUser(id)]);
+    if (notesRes.status === 'fulfilled') setNotes(notesRes.value.data || []);
+    else console.error('Failed to fetch notes:', notesRes.reason);
+    if (tasksRes.status === 'fulfilled') setTasks(tasksRes.value.data || []);
+    else console.error('Failed to fetch tasks:', tasksRes.reason);
   };
 
   const fetchProfile = async (id) => {
