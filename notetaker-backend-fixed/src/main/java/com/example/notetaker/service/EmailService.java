@@ -1,19 +1,23 @@
 package com.example.notetaker.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
+import jakarta.mail.internet.MimeMessage;
 
 @Service
 public class EmailService {
 
-    @Value("${resend.api.key}")
-    private String resendApiKey;
+    private final JavaMailSender mailSender;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    public EmailService(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
 
     public void sendOtpEmail(String toEmail, String otp) {
         send(toEmail, "Your OTP Code",
@@ -27,26 +31,19 @@ public class EmailService {
     }
 
     private void send(String toEmail, String subject, String html) {
-        String url = "https://api.resend.com/emails";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(resendApiKey);
-
-        Map<String, Object> body = Map.of(
-                "from", "onboarding@resend.dev",
-                "to", toEmail,
-                "subject", subject,
-                "html", html
-        );
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-            System.out.println("Email sent successfully via Resend: " + response.getBody());
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(html, true); // true = HTML content
+
+            mailSender.send(message);
+            System.out.println("Email sent successfully via Gmail SMTP to: " + toEmail);
         } catch (Exception e) {
-            System.err.println("Failed to send email via Resend API: " + e.getMessage());
+            System.err.println("Failed to send email via Gmail SMTP: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Failed to send email: " + e.getMessage());
         }
     }
